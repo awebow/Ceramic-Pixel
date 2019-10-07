@@ -1,10 +1,19 @@
 #include "Application.h"
-#include "Canvas.h"
 #include <iostream>
+#include "PixelPainter.h"
+#include "Scroller.h"
+#include "Zoom.h"
 
 namespace app {
 	int width;
 	int height;
+
+	GLFWwindow* window;
+	Tool* clickTool;
+	Tool* scrollTool;
+
+	PixelPainter pixelPainter;
+	Scroller scroller;
 
 	Canvas* canvas;
 }
@@ -15,22 +24,22 @@ void app::init(int argc, char* argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	app::width = 480;
-	app::height = 320;
-	GLFWwindow* window = glfwCreateWindow(app::width, app::height, "Ceramic Pixel", NULL, NULL);
+	width = 480;
+	height = 320;
+	clickTool = &pixelPainter;
+	scrollTool = new Zoom();
+	window = glfwCreateWindow(app::width, app::height, "Ceramic Pixel", NULL, NULL);
 
-	glfwSetWindowSizeCallback(window, app::resize);
+	glfwSetWindowSizeCallback(window, resize);
+	glfwSetMouseButtonCallback(window, onMouseButton);
+	glfwSetCursorPosCallback(window, onMouseMove);
+	glfwSetScrollCallback(window, onScroll);
+	glfwSetKeyCallback(window, onKey);
 
 	glfwMakeContextCurrent(window);
 	app::updateViewport();
 
 	canvas = new Canvas(1024, 1024);
-
-	while (!glfwWindowShouldClose(window)) {
-		display();
-		glfwSwapBuffers(window);
-		glfwPollEvents();
-	}
 	
 	/*glutInitWindowSize(480, 320);
 	glutInitDisplayMode(GLUT_RGB);
@@ -43,6 +52,12 @@ void app::init(int argc, char* argv[]) {
 }
 
 void app::run() {
+	glfwSwapInterval(1);
+	while (!glfwWindowShouldClose(window)) {
+		display();
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
 }
 
 void app::display() {
@@ -64,4 +79,38 @@ void app::resize(GLFWwindow* window, int width, int height) {
 
 void app::updateViewport() {
 	glViewport(0, 0, width, height);
+}
+
+void app::onMouseButton(GLFWwindow* window, int button, int action, int mods) {
+	double x, y;
+	glfwGetCursorPos(window, &x, &y);
+
+	clickTool->onMouseButton(button, action, (int) x, height - (int) y);
+}
+
+void app::onMouseMove(GLFWwindow* window, double x, double y) {
+	clickTool->onMouseMove((int) x, height - (int) y);
+}
+
+void app::onScroll(GLFWwindow* window, double x, double y) {
+	scrollTool->onScroll(x, y);
+}
+
+void app::onKey(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (key == GLFW_KEY_SPACE) {
+		if (action == GLFW_PRESS && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS) {
+			clickTool = &scroller;
+		}
+		else if (action == GLFW_RELEASE) {
+			clickTool = &pixelPainter;
+		}
+	}
+}
+
+int app::getCanvasX(int x) {
+	return (x - canvas->getLeft()) / canvas->getZoom();
+}
+
+int app::getCanvasY(int y) {
+	return (y - canvas->getBottom()) / canvas->getZoom();
 }
